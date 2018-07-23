@@ -41,12 +41,18 @@ package iqube.surya.testapplication;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.hardware.Camera;
 import android.location.Location;
+import android.net.Uri;
+import android.net.wifi.WifiConfiguration;
+import android.net.wifi.WifiManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.util.Log;
@@ -60,7 +66,9 @@ import android.widget.Toast;
 import org.eclipse.paho.android.service.MqttAndroidClient;
 import org.eclipse.paho.client.mqttv3.MqttException;
 
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Method;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -73,81 +81,149 @@ public class CameraRecorder extends Activity implements SurfaceHolder.Callback {
 	public static Camera mCamera;
     private MqttAndroidClient client;
     private PahoMqttClient pahoMqttClient;
-    public static final String lat_new = null;
 
 
-	
-	/** Called when the activity is first created. */
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.main);
-        
-		mSurfaceView = (SurfaceView) findViewById(R.id.surfaceView1);
+		super.onCreate(savedInstanceState);
+		setContentView(R.layout.main);
+
+		mSurfaceView = findViewById(R.id.surfaceView1);
 		mSurfaceHolder = mSurfaceView.getHolder();
 		mSurfaceHolder.addCallback(this);
 		mSurfaceHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
-		if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-			// TODO: Consider calling
-			//    ActivityCompat#requestPermissions
-			// here to request the missing permissions, and then overriding
-			//   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-			//                                          int[] grantResults)
-			// to handle the case where the user grants the permission. See the documentation
-			// for ActivityCompat#requestPermissions for more details.
-			ActivityCompat.requestPermissions(this,
-					new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 100);
+        if(!hasPermissions(this, PERMISSIONS)){
+            ActivityCompat.requestPermissions(this, PERMISSIONS, PERMISSION_ALL);
+        }else {
+            startService(new Intent(CameraRecorder.this, LocationService.class));
 
-			return;
-		}else {
-
-			startService(new Intent(CameraRecorder.this, LocationService.class));
-		}
-		Button btnStart = (Button) findViewById(R.id.StartService);
-		btnStart.setOnClickListener(new View.OnClickListener()
-		{
-			public void onClick(View v)
-			{
-				Intent intent = new Intent(CameraRecorder.this, RecorderService.class);
-				intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-				startService(intent);
-				finish();
-			}
-		});
-
-		Button btnStop = (Button) findViewById(R.id.StopService);
-		btnStop.setOnClickListener(new View.OnClickListener()
-		{
-			public void onClick(View v)
-			{
-				stopService(new Intent(CameraRecorder.this, RecorderService.class));
-			}
-		});
+            Button btnStart = (Button) findViewById(R.id.StartService);
+            btnStart.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    Intent intent = new Intent(CameraRecorder.this, RecorderService.class);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startService(intent);
+                    finish();
+                }
+            });
+            Button btnStop = findViewById(R.id.StopService);
+            btnStop.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    stopService(new Intent(CameraRecorder.this, RecorderService.class));
+                }
+            });
+        }
 //MQTT Code
 
-        pahoMqttClient = new PahoMqttClient();
-        client = pahoMqttClient.getMqttClient(getApplicationContext(), Constants.MQTT_BROKER_URL, Constants.CLIENT_ID);
-        final Handler handler = new Handler();
-        Timer timer = new Timer();
-        TimerTask doAsynchronousTask = new TimerTask() {
-            @Override
-            public void run() {
-                handler.post(new Runnable() {
-                    public void run() {
-                        try {
-                            pahoMqttClient.publishMessage(client, ""+LocationService.infoR, 1, Constants.PUBLISH_TOPIC);
-                            Log.d("MQTT2",""+LocationService.infoR);
-                        } catch (Exception e) {
-                        }
-                    }
-                });
+		if (isOnline() == true) {
+			if (LocationService.infoR != null) {
+				pahoMqttClient = new PahoMqttClient();
+				client = pahoMqttClient.getMqttClient(getApplicationContext(), Constants.MQTT_BROKER_URL, Constants.CLIENT_ID);
+				final Handler handler = new Handler();
+				Timer timer = new Timer();
+				TimerTask doAsynchronousTask = new TimerTask() {
+					@Override
+					public void run() {
+						handler.post(new Runnable() {
+							public void run() {
+								try {
+									pahoMqttClient.publishMessage(client, "" + LocationService.infoR, 1, Constants.PUBLISH_TOPIC);
+									Log.d("MQTT2", "" + LocationService.infoR);
+								} catch (Exception e) {
+								}
+							}
+						});
+					}
+				};
+				timer.schedule(doAsynchronousTask, 0, 1000); // 30 secs
+			}
+            else{
+                Toast.makeText(CameraRecorder.this,"Location Value is null",Toast.LENGTH_LONG).show();
             }
-        };
-        timer.schedule(doAsynchronousTask, 0, 1000); // 30 secs
+		}
 
+		else {
+			Toast.makeText(CameraRecorder.this,"No internet available",Toast.LENGTH_LONG).show();
+		}
+
+		// Shutdown Code
+		Button shutdown = findViewById(R.id.shutdown);
+		shutdown.setOnClickListener(new View.OnClickListener()
+		{
+			public void onClick(View v)
+			{
+				try {
+					Process proc = Runtime.getRuntime()
+							.exec(new String[]{ "su", "-c", "reboot -p" });
+					proc.waitFor();
+				} catch (Exception ex) {
+					ex.printStackTrace();
+					Toast.makeText(CameraRecorder.this,""+ex,Toast.LENGTH_LONG).show();
+				}
+			}
+		});
+
+		//Hotspot On
+        Button hotspot = findViewById(R.id.hotspot);
+
+        hotspot.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                Hotspot hotspot1 = new Hotspot();
+                hotspot1.configApState(CameraRecorder.this);
+//Through root
+//                try {
+//                    Process proc = Runtime.getRuntime()
+//                            .exec(new String[]{ "su", "-c", "/system/bin/hostapd" });
+//                    proc.waitFor();
+//                } catch (Exception ex) {
+//                    ex.printStackTrace();
+//                    Toast.makeText(CameraRecorder.this,""+ex,Toast.LENGTH_LONG).show();
+//                }
+            }
+        });
     }
+//Check network
+	public boolean isOnline() {
+		Runtime runtime = Runtime.getRuntime();
+		try {
+			Process ipProcess = runtime.exec("/system/bin/ping -c 1 8.8.8.8");
+			int     exitValue = ipProcess.waitFor();
+			return (exitValue == 0);
+		}
+		catch (IOException e)          { e.printStackTrace(); }
+		catch (InterruptedException e) { e.printStackTrace(); }
+
+		return false;
+	}
 
 
+	// Permissions
+    int PERMISSION_ALL = 1;
+    String[] PERMISSIONS = {
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            android.Manifest.permission.CAMERA,
+            Manifest.permission.RECORD_AUDIO,
+            Manifest.permission.ACCESS_NETWORK_STATE,
+            Manifest.permission.CHANGE_NETWORK_STATE,
+            Manifest.permission.CHANGE_WIFI_STATE,
+            Manifest.permission.ACCESS_WIFI_STATE,
+            Manifest.permission.ACCESS_WIFI_STATE,
+            Manifest.permission.CHANGE_WIFI_STATE,
+            Manifest.permission.ACCESS_NETWORK_STATE
+    };
+
+    public static boolean hasPermissions(Context context, String... permissions) {
+        if (context != null && permissions != null) {
+            for (String permission : permissions) {
+                if (ActivityCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
     
 	@Override
 	public void surfaceCreated(SurfaceHolder holder) {

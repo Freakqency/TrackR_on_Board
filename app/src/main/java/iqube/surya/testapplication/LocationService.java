@@ -101,7 +101,7 @@ public class LocationService extends Service {
                     longitude=""+longt;
                     date_new=" "+simpleDateFormat.format(date);
                     infoR=""+latitude+""+longitude+""+date_new;
-//                    Log.d("Test",last);
+//                    Log.d("Crazy Test",infoR);
 
 
                 }
