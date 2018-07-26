@@ -52,49 +52,46 @@ import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
-import android.provider.Settings;
 import android.support.annotation.NonNull;
+import android.support.annotation.RequiresApi;
 import android.support.v4.app.ActivityCompat;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 import android.widget.Button;
-import android.widget.EditText;
+
 import android.widget.Toast;
 
 import org.eclipse.paho.android.service.MqttAndroidClient;
-import org.eclipse.paho.client.mqttv3.MqttException;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.lang.reflect.Method;
 import java.util.Timer;
 import java.util.TimerTask;
 
 public class CameraRecorder extends Activity implements SurfaceHolder.Callback {
 
-	private static final String TAG = CameraRecorder.class.getSimpleName();
+    private static final String TAG = CameraRecorder.class.getSimpleName();
 
-	public static SurfaceView mSurfaceView;
-	public static SurfaceHolder mSurfaceHolder;
-	public static Camera mCamera;
+    public static SurfaceView mSurfaceView;
+    public static SurfaceHolder mSurfaceHolder;
+    public static Camera mCamera;
     private MqttAndroidClient client;
     private PahoMqttClient pahoMqttClient;
-
+    boolean flag = true;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-		super.onCreate(savedInstanceState);
-		setContentView(R.layout.main);
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.main);
 
-		mSurfaceView = findViewById(R.id.surfaceView1);
-		mSurfaceHolder = mSurfaceView.getHolder();
-		mSurfaceHolder.addCallback(this);
-		mSurfaceHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
-        if(!hasPermissions(this, PERMISSIONS)){
+        mSurfaceView = findViewById(R.id.surfaceView1);
+        mSurfaceHolder = mSurfaceView.getHolder();
+        mSurfaceHolder.addCallback(this);
+        mSurfaceHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+        if (!hasPermissions(this, PERMISSIONS)) {
             ActivityCompat.requestPermissions(this, PERMISSIONS, PERMISSION_ALL);
-        }else {
+        } else {
             startService(new Intent(CameraRecorder.this, LocationService.class));
 
             Button btnStart = (Button) findViewById(R.id.StartService);
@@ -115,89 +112,98 @@ public class CameraRecorder extends Activity implements SurfaceHolder.Callback {
         }
 //MQTT Code
 
-		if (isOnline() == true) {
-			if (LocationService.infoR != null) {
-				pahoMqttClient = new PahoMqttClient();
-				client = pahoMqttClient.getMqttClient(getApplicationContext(), Constants.MQTT_BROKER_URL, Constants.CLIENT_ID);
-				final Handler handler = new Handler();
-				Timer timer = new Timer();
-				TimerTask doAsynchronousTask = new TimerTask() {
-					@Override
-					public void run() {
-						handler.post(new Runnable() {
-							public void run() {
-								try {
-									pahoMqttClient.publishMessage(client, "" + LocationService.infoR, 1, Constants.PUBLISH_TOPIC);
-									Log.d("MQTT2", "" + LocationService.infoR);
-								} catch (Exception e) {
-								}
-							}
-						});
-					}
-				};
-				timer.schedule(doAsynchronousTask, 0, 1000); // 30 secs
-			}
-            else{
-                Toast.makeText(CameraRecorder.this,"Location Value is null",Toast.LENGTH_LONG).show();
+        if (isOnline() == true) {
+
+            pahoMqttClient = new PahoMqttClient();
+            client = pahoMqttClient.getMqttClient(getApplicationContext(), Constants.MQTT_BROKER_URL, Constants.CLIENT_ID);
+            final Handler handler = new Handler();
+            Timer timer = new Timer();
+            TimerTask doAsynchronousTask = new TimerTask() {
+                @Override
+                public void run() {
+                    handler.post(new Runnable() {
+                        public void run() {
+                            try {
+                                if (LocationService.infoR == null) {
+                                    Toast.makeText(CameraRecorder.this, "Location value is null check code", Toast.LENGTH_LONG).show();
+                                } else {
+                                    pahoMqttClient.publishMessage(client, "" + LocationService.infoR, 1, Constants.PUBLISH_TOPIC);
+                                    Log.d("MQTT2", "" + LocationService.infoR);
+                                }
+                            } catch (Exception e) {
+                            }
+                        }
+                    });
+                }
+            };
+            timer.schedule(doAsynchronousTask, 0, 1000); // 30 secs
+        } else {
+            Toast.makeText(CameraRecorder.this, "No internet available", Toast.LENGTH_LONG).show();
+        }
+
+        // Shutdown Code
+        Button shutdown = findViewById(R.id.shutdown);
+        shutdown.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                try {
+                    Process proc = Runtime.getRuntime()
+                            .exec(new String[]{"su", "-c", "reboot -p"});
+                    proc.waitFor();
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    Toast.makeText(CameraRecorder.this, "" + ex, Toast.LENGTH_LONG).show();
+                }
             }
-		}
+        });
 
-		else {
-			Toast.makeText(CameraRecorder.this,"No internet available",Toast.LENGTH_LONG).show();
-		}
-
-		// Shutdown Code
-		Button shutdown = findViewById(R.id.shutdown);
-		shutdown.setOnClickListener(new View.OnClickListener()
-		{
-			public void onClick(View v)
-			{
-				try {
-					Process proc = Runtime.getRuntime()
-							.exec(new String[]{ "su", "-c", "reboot -p" });
-					proc.waitFor();
-				} catch (Exception ex) {
-					ex.printStackTrace();
-					Toast.makeText(CameraRecorder.this,""+ex,Toast.LENGTH_LONG).show();
-				}
-			}
-		});
-
-		//Hotspot On
+        //Hotspot On
         Button hotspot = findViewById(R.id.hotspot);
 
         hotspot.setOnClickListener(new View.OnClickListener() {
+            @RequiresApi(api = Build.VERSION_CODES.O)
             public void onClick(View v) {
-                Hotspot hotspot1 = new Hotspot();
-                hotspot1.configApState(CameraRecorder.this);
-//Through root
-//                try {
-//                    Process proc = Runtime.getRuntime()
-//                            .exec(new String[]{ "su", "-c", "/system/bin/hostapd" });
-//                    proc.waitFor();
-//                } catch (Exception ex) {
-//                    ex.printStackTrace();
-//                    Toast.makeText(CameraRecorder.this,""+ex,Toast.LENGTH_LONG).show();
-//                }
+                if (flag) {
+                    turnOnHotspot();
+                    flag = false;
+                }
+                else {
+                    turnOffHotspot();
+                    flag = true;
+                }
             }
         });
+
+
+        //Server Code
+        Button server = findViewById(R.id.server);
+        server.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                new Server().start();
+                Log.d("SERVER TEST:","Turning on server now");
+            }
+        });
+
     }
-//Check network
-	public boolean isOnline() {
-		Runtime runtime = Runtime.getRuntime();
-		try {
-			Process ipProcess = runtime.exec("/system/bin/ping -c 1 8.8.8.8");
-			int     exitValue = ipProcess.waitFor();
-			return (exitValue == 0);
-		}
-		catch (IOException e)          { e.printStackTrace(); }
-		catch (InterruptedException e) { e.printStackTrace(); }
 
-		return false;
-	}
+    //Check network
+    public boolean isOnline() {
+        Runtime runtime = Runtime.getRuntime();
+        try {
+            Process ipProcess = runtime.exec("/system/bin/ping -c 1 8.8.8.8");
+            int exitValue = ipProcess.waitFor();
+            return (exitValue == 0);
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        return false;
+    }
 
 
-	// Permissions
+    // Permissions
     int PERMISSION_ALL = 1;
     String[] PERMISSIONS = {
             Manifest.permission.ACCESS_COARSE_LOCATION,
@@ -224,27 +230,66 @@ public class CameraRecorder extends Activity implements SurfaceHolder.Callback {
         }
         return true;
     }
-    
-	@Override
-	public void surfaceCreated(SurfaceHolder holder) {
-		
-	}
 
-	@Override
-	public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-	}
-	
-	@Override
-	public void surfaceDestroyed(SurfaceHolder holder) {
-	}
 
-	@Override
-	public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-		if(grantResults.length>0){
-			startService(new Intent(this,LocationService.class));
-		}else{
-			Toast.makeText(this,"Location Service Denied",Toast.LENGTH_LONG).show();
-		}
+    //Hotspot code
+    private WifiManager.LocalOnlyHotspotReservation mReservation;
 
-	}
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    private void turnOnHotspot() {
+        WifiManager manager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+
+        manager.startLocalOnlyHotspot(new WifiManager.LocalOnlyHotspotCallback() {
+
+            @Override
+            public void onStarted(WifiManager.LocalOnlyHotspotReservation reservation) {
+                super.onStarted(reservation);
+                Log.d(TAG, "Wifi Hotspot is on now");
+                mReservation = reservation;
+            }
+
+            @Override
+            public void onStopped() {
+                super.onStopped();
+                Log.d(TAG, "onStopped: ");
+            }
+
+            @Override
+            public void onFailed(int reason) {
+                super.onFailed(reason);
+                Log.d(TAG, "onFailed: ");
+            }
+        }, new Handler());
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    private void turnOffHotspot() {
+        if (mReservation != null) {
+            mReservation.close();
+        }
+    }
+
+
+    @Override
+    public void surfaceCreated(SurfaceHolder holder) {
+
+    }
+
+    @Override
+    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+    }
+
+    @Override
+    public void surfaceDestroyed(SurfaceHolder holder) {
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        if (grantResults.length > 0) {
+            startService(new Intent(this, LocationService.class));
+        } else {
+            Toast.makeText(this, "Location Service Denied", Toast.LENGTH_LONG).show();
+        }
+
+    }
 }
