@@ -43,6 +43,7 @@ import android.app.Service;
 import android.content.Intent;
 import android.hardware.Camera;
 import android.hardware.Camera.Size;
+import android.media.CamcorderProfile;
 import android.media.MediaRecorder;
 import android.os.Environment;
 import android.os.IBinder;
@@ -52,6 +53,8 @@ import android.view.SurfaceView;
 import android.widget.Toast;
 
 import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.List;
 
 public class RecorderService extends Service {
@@ -61,6 +64,7 @@ public class RecorderService extends Service {
 	private static Camera mServiceCamera;
 	private boolean mRecordingStatus;
 	private MediaRecorder mMediaRecorder;
+//	CamcorderProfile cpHigh = CamcorderProfile.get(CamcorderProfile.QUALITY_HIGH);
 	
 	@Override
 	public void onCreate() {
@@ -68,7 +72,7 @@ public class RecorderService extends Service {
 		mServiceCamera = CameraRecorder.mCamera;
 		mSurfaceView = CameraRecorder.mSurfaceView;
 		mSurfaceHolder = CameraRecorder.mSurfaceHolder;
-		
+
 		super.onCreate();
 	}
 
@@ -121,19 +125,28 @@ public class RecorderService extends Service {
 				Log.e(TAG, e.getMessage());
 				e.printStackTrace();
 			}
-			
+			Calendar c = Calendar.getInstance();
+			SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+			String formattedDate = df.format(c.getTime());
+			String dtout=String.format("/%s.mp4",formattedDate);
 			mServiceCamera.unlock();
 
 			mMediaRecorder = new MediaRecorder();
 			mMediaRecorder.setCamera(mServiceCamera);
+
 			mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
 			mMediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
 			mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
+//			mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
+//            mMediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
+			mMediaRecorder.setVideoSize(640, 480);
+			mMediaRecorder.setVideoFrameRate(16); //might be auto-determined due to lighting
+			mMediaRecorder.setVideoEncodingBitRate(3000000);
+			mMediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);// MPEG_4_SP
 			mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
-            mMediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
-			mMediaRecorder.setOutputFile(Environment.getExternalStorageDirectory().getPath() + "/video.mp4");
+			mMediaRecorder.setOutputFile(Environment.getExternalStorageDirectory().getPath() + dtout);
 			mMediaRecorder.setPreviewDisplay(mSurfaceHolder.getSurface());
-			
+
 			mMediaRecorder.prepare();
 			mMediaRecorder.start();
 

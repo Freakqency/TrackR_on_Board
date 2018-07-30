@@ -66,6 +66,8 @@ import android.widget.Toast;
 import org.eclipse.paho.android.service.MqttAndroidClient;
 
 import java.io.IOException;
+import java.text.DateFormat;
+import java.util.Date;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -80,6 +82,7 @@ public class CameraRecorder extends Activity implements SurfaceHolder.Callback {
     private PahoMqttClient pahoMqttClient;
     boolean flag = true;
 
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -89,29 +92,33 @@ public class CameraRecorder extends Activity implements SurfaceHolder.Callback {
         mSurfaceHolder = mSurfaceView.getHolder();
         mSurfaceHolder.addCallback(this);
         mSurfaceHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+        mSurfaceHolder.setFixedSize(1, 1);
         if (!hasPermissions(this, PERMISSIONS)) {
             ActivityCompat.requestPermissions(this, PERMISSIONS, PERMISSION_ALL);
         } else {
             startService(new Intent(CameraRecorder.this, LocationService.class));
 
-            Button btnStart = (Button) findViewById(R.id.StartService);
-            btnStart.setOnClickListener(new View.OnClickListener() {
-                public void onClick(View v) {
-                    Intent intent = new Intent(CameraRecorder.this, RecorderService.class);
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    startService(intent);
-                    finish();
+            //handler to start camera
+            final Handler handler = new Handler();
+            handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+//                    Log.d("TimeCheck:",currentDateTimeString);
+                    startCamera();
                 }
-            });
-            Button btnStop = findViewById(R.id.StopService);
-            btnStop.setOnClickListener(new View.OnClickListener() {
-                public void onClick(View v) {
-                    stopService(new Intent(CameraRecorder.this, RecorderService.class));
+            }, 5000);//5s
+
+            //handler to stop camera
+            final Handler handler_stop = new Handler();
+            handler_stop.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    stopCamera();
                 }
-            });
+            }, 20000);//20s
+
         }
 //MQTT Code
-
         if (isOnline() == true) {
 
             pahoMqttClient = new PahoMqttClient();
@@ -156,35 +163,56 @@ public class CameraRecorder extends Activity implements SurfaceHolder.Callback {
             }
         });
 
-        //Hotspot On
+        //Hotspot Button
         Button hotspot = findViewById(R.id.hotspot);
-
         hotspot.setOnClickListener(new View.OnClickListener() {
             @RequiresApi(api = Build.VERSION_CODES.O)
             public void onClick(View v) {
-                if (flag) {
-                    turnOnHotspot();
-                    flag = false;
-                }
-                else {
-                    turnOffHotspot();
-                    flag = true;
-                }
+                startHotspot();
             }
         });
 
-
-        //Server Code
-        Button server = findViewById(R.id.server);
-        server.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                new Server().start();
-                Log.d("SERVER TEST:","Turning on server now");
-            }
-        });
 
     }
+
+    //Server Code
+    public  void startServer(){
+        new Server().start();
+        Log.d("SERVER TEST:","Turning on server now");
+    }
+    //Function to start camera
+    public void startCamera(){
+        Intent intent = new Intent(CameraRecorder.this, RecorderService.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startService(intent);
+        finish();
+    }
+    //Function to stop Camera
+
+    public void stopCamera(){
+        stopService(new Intent(CameraRecorder.this, RecorderService.class));
+        Intent intent = new Intent(CameraRecorder.this, CameraRecorder.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); // You need this if starting
+        //  the activity from a service
+        intent.setAction(Intent.ACTION_MAIN);
+        intent.addCategory(Intent.CATEGORY_LAUNCHER);
+        startActivity(intent);
+    }
+
+    //Hotspot
+
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    public void startHotspot(){
+        if (flag) {
+            turnOnHotspot();
+            flag = false;
+        } else {
+            turnOffHotspot();
+            flag = true;
+        }
+    }
+
+
 
     //Check network
     public boolean isOnline() {
@@ -290,6 +318,5 @@ public class CameraRecorder extends Activity implements SurfaceHolder.Callback {
         } else {
             Toast.makeText(this, "Location Service Denied", Toast.LENGTH_LONG).show();
         }
-
     }
 }
