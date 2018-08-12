@@ -15,10 +15,33 @@
 		android:layout_width="wrap_content"
 		android:layout_height="wrap_content" />
 
+	<Button
+		android:id="@+id/mount"
+		android:text="Mount"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content" />
+
+	<Button
+		android:id="@+id/grant"
+		android:text="Grant"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content" />
+
+	<Button
+		android:id="@+id/revoke"
+		android:text="Revoke"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content" />
+
+	<Button
+		android:id="@+id/reboot"
+		android:text="Reboot"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content" />
+
     <SurfaceView
 	android:id="@+id/surfaceView1" 
 	android:layout_width="wrap_content" 
 	android:layout_height="wrap_content">
 </SurfaceView>
-
 </LinearLayout>

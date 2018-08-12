@@ -34,3 +34,4 @@ dependencies {
     implementation 'org.eclipse.paho:org.eclipse.paho.android.service:1.0.3-SNAPSHOT'
 
 }
+

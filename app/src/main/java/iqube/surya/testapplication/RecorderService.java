@@ -39,11 +39,11 @@
 
 package iqube.surya.testapplication;
 
+import android.annotation.SuppressLint;
 import android.app.Service;
 import android.content.Intent;
 import android.hardware.Camera;
 import android.hardware.Camera.Size;
-import android.media.CamcorderProfile;
 import android.media.MediaRecorder;
 import android.os.Environment;
 import android.os.IBinder;
@@ -51,15 +51,14 @@ import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.widget.Toast;
-
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.List;
 
+
 public class RecorderService extends Service {
 	private static final String TAG = "RecorderService";
-	private SurfaceView mSurfaceView;
 	private SurfaceHolder mSurfaceHolder;
 	private static Camera mServiceCamera;
 	private boolean mRecordingStatus;
@@ -70,10 +69,12 @@ public class RecorderService extends Service {
 	public void onCreate() {
 		mRecordingStatus = false;
 		mServiceCamera = CameraRecorder.mCamera;
+		SurfaceView mSurfaceView;
 		mSurfaceView = CameraRecorder.mSurfaceView;
 		mSurfaceHolder = CameraRecorder.mSurfaceHolder;
 
-		super.onCreate();
+
+
 	}
 
 	@Override
@@ -84,10 +85,12 @@ public class RecorderService extends Service {
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
 		super.onStartCommand(intent, flags, startId);
+		super.onCreate();
 
-		if (mRecordingStatus == false)
+
+		if (!mRecordingStatus) {
 			startRecording();
-
+		}
 		return START_STICKY;
 	}
 
@@ -95,7 +98,6 @@ public class RecorderService extends Service {
 	public void onDestroy() {
 		stopRecording();
 		mRecordingStatus = false;
-		
 		super.onDestroy();
 	}   
 
@@ -126,7 +128,7 @@ public class RecorderService extends Service {
 				e.printStackTrace();
 			}
 			Calendar c = Calendar.getInstance();
-			SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+			@SuppressLint("SimpleDateFormat") SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 			String formattedDate = df.format(c.getTime());
 			String dtout=String.format("/%s.mp4",formattedDate);
 			mServiceCamera.unlock();
@@ -151,7 +153,7 @@ public class RecorderService extends Service {
 			mMediaRecorder.start();
 
 			mRecordingStatus = true;
-			
+
 			return true;
 
 		} catch (IllegalStateException e) {
@@ -164,6 +166,9 @@ public class RecorderService extends Service {
 			e.printStackTrace();
 			return false;
 		}
+
+
+
 	}
 
 	public void stopRecording() {

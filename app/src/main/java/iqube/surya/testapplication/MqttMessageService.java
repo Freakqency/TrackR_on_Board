@@ -6,6 +6,7 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
 import android.util.Log;
+import android.widget.Toast;
 
 import org.eclipse.paho.android.service.MqttAndroidClient;
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
@@ -14,9 +15,9 @@ import org.eclipse.paho.client.mqttv3.MqttMessage;
 
 public class MqttMessageService extends Service {
 
+
+
     private static final String TAG = "MqttMessageService";
-    private PahoMqttClient pahoMqttClient;
-    private MqttAndroidClient mqttAndroidClient;
 
     public MqttMessageService() {
     }
@@ -25,8 +26,8 @@ public class MqttMessageService extends Service {
     public void onCreate() {
         super.onCreate();
         Log.d(TAG, "onCreate");
-        pahoMqttClient = new PahoMqttClient();
-        mqttAndroidClient = pahoMqttClient.getMqttClient(getApplicationContext(), Constants.MQTT_BROKER_URL, Constants.CLIENT_ID);
+        PahoMqttClient pahoMqttClient = new PahoMqttClient();
+        MqttAndroidClient mqttAndroidClient = pahoMqttClient.getMqttClient(getApplicationContext(), Constants.MQTT_BROKER_URL, Constants.CLIENT_ID);
 
         mqttAndroidClient.setCallback(new MqttCallbackExtended() {
             @Override
@@ -40,8 +41,8 @@ public class MqttMessageService extends Service {
             }
 
             @Override
-            public void messageArrived(String topic, MqttMessage message) throws Exception {
-
+            public void messageArrived(String topic, MqttMessage message) {
+                Toast.makeText(MqttMessageService.this,message.toString(),Toast.LENGTH_LONG).show();
             }
 
             @Override
@@ -68,5 +69,6 @@ public class MqttMessageService extends Service {
         super.onDestroy();
         Log.d(TAG, "onDestroy");
     }
+
 
 }

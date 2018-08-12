@@ -61,16 +61,13 @@ public class PahoMqttClient {
         MqttConnectOptions mqttConnectOptions = new MqttConnectOptions();
         mqttConnectOptions.setCleanSession(false);
         mqttConnectOptions.setAutomaticReconnect(true);
-        //mqttConnectOptions.setWill(Constants.PUBLISH_TOPIC, "I am going offline".getBytes(), 1, true);
-        //mqttConnectOptions.setUserName("ngbllzzy");
-        //mqttConnectOptions.setPassword("WtjhZKl3OPoK".toCharArray());
         return mqttConnectOptions;
     }
 
 
     public void publishMessage(@NonNull MqttAndroidClient client, @NonNull String msg, int qos, @NonNull String topic)
             throws MqttException, UnsupportedEncodingException {
-        byte[] encodedPayload = new byte[0];
+        byte[] encodedPayload;
         encodedPayload = msg.getBytes("UTF-8");
         MqttMessage message = new MqttMessage(encodedPayload);
         message.setId(320);
@@ -78,6 +75,24 @@ public class PahoMqttClient {
         message.setQos(qos);
         client.publish(topic, message);
     }
+    public void subscribe(@NonNull MqttAndroidClient client, @NonNull final String topic, int qos) throws MqttException {
+        IMqttToken token = client.subscribe(topic, qos);
+        token.setActionCallback(new IMqttActionListener() {
+            @Override
+            public void onSuccess(IMqttToken iMqttToken) {
+                Log.d(TAG, "Subscribe Successfully " + topic);
+            }
+
+            @Override
+            public void onFailure(IMqttToken iMqttToken, Throwable throwable) {
+                Log.e(TAG, "Subscribe Failed " + topic);
+
+            }
+        });
+    }
+
+
+
 
 
 
