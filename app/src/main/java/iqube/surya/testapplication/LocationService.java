@@ -25,10 +25,10 @@ public class LocationService extends Service {
     public static int START;
     private Location location;
     private Handler mHandler;
+    public static long count=0;
     public static String longitude;
     public static String latitude;
     public static String date_new;
-    public static String infoR;
 
     long mInterval=1000;
     @Override
@@ -82,9 +82,8 @@ public class LocationService extends Service {
                     latitude=""+lat;
                     longitude=""+longt;
                     date_new=" "+simpleDateFormat.format(date);
-                    infoR=""+latitude+""+longitude+""+date_new;
+                    count=count+1;
 //                    Log.d("Crazy Test",infoR);
-
 
                 }
                 mHandler.postDelayed(mStatusChecker,mInterval);

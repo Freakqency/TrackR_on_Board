@@ -1,6 +1,7 @@
 package iqube.surya.testapplication;
 
 
+import android.annotation.SuppressLint;
 import android.app.Service;
 
 import android.content.Intent;
@@ -40,9 +41,49 @@ public class MqttMessageService extends Service {
 
             }
 
+            @SuppressLint("NewApi")
             @Override
             public void messageArrived(String topic, MqttMessage message) {
-                Toast.makeText(MqttMessageService.this,message.toString(),Toast.LENGTH_LONG).show();
+                CameraRecorder cameraRecorder = new CameraRecorder();
+                switch (message.toString()) {
+                    case "Shutdown":
+                        cameraRecorder.shutDown();
+                        break;
+                    case "Start Hotspot":
+                        cameraRecorder.turnOnHotspot();
+                        break;
+                    case "Mount":
+                        cameraRecorder.mountStorage();
+                        break;
+                    case "Grant":
+                        cameraRecorder.grantPower();
+                        break;
+                    case "Revoke":
+                        cameraRecorder.revokePower();
+                        break;
+                    case "Reboot":
+                        cameraRecorder.rebootSystem();
+                        break;
+                    case "Lock":
+                        cameraRecorder.lockScreen();
+                        break;
+                    case "Stop Hotspot":
+                        cameraRecorder.turnOffHotspot();
+                        break;
+
+                    case "Stop Server":
+                        cameraRecorder.turnOffHotspot();
+                        break;
+
+                    case "Start Camera":
+                        cameraRecorder.startCamera();
+                        break;
+
+                    case "Stop Camera":
+                        cameraRecorder.stopCamera();
+                        break;
+
+                }
             }
 
             @Override

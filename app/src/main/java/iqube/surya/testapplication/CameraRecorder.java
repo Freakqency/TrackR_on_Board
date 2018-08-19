@@ -1,41 +1,3 @@
-/*
- * Copyright (c) 2015, Picker Weng
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- *  Redistributions of source code must retain the above copyright notice, this
- *   list of conditions and the following disclaimer.
- *
- *  Redistributions in binary form must reproduce the above copyright notice,
- *   this list of conditions and the following disclaimer in the documentation
- *   and/or other materials provided with the distribution.
- *
- *  Neither the name of CameraRecorder nor the names of its
- *   contributors may be used to endorse or promote products derived from
- *   this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * Project:
- *     CameraRecorder
- *
- * File:
- *     CameraRecorder.java
- *
- * Author:
- *     Picker Weng (pickerweng@gmail.com)
- */
 
 package iqube.surya.testapplication;
 
@@ -54,20 +16,27 @@ import android.support.annotation.NonNull;
 import android.support.annotation.RequiresApi;
 import android.support.v4.app.ActivityCompat;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.Toast;
 import org.eclipse.paho.android.service.MqttAndroidClient;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import java.io.IOException;
-import java.util.Objects;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.io.UnsupportedEncodingException;
 
+
+import io.realm.Realm;
+import io.realm.RealmResults;
+
+import static android.widget.Toast.LENGTH_LONG;
+
+@RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
 public class CameraRecorder extends Activity implements SurfaceHolder.Callback {
 
     private static final String TAG = CameraRecorder.class.getSimpleName();
@@ -78,21 +47,25 @@ public class CameraRecorder extends Activity implements SurfaceHolder.Callback {
     public static Camera mCamera;
     private MqttAndroidClient client;
     private PahoMqttClient pahoMqttClient;
-    boolean flag = true;
     public Handler subscribe_handler = null;
     public static Runnable subscribe_runnable = null;
+    Realm realm;
 
 
 
-    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
+
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         // Full Screen Acitivty
+
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setContentView(R.layout.main);
+
+        Thread.setDefaultUncaughtExceptionHandler(new DefaultExceptionHandler(this));
 
         mSurfaceView = findViewById(R.id.surfaceView1);
         mSurfaceHolder = mSurfaceView.getHolder();
@@ -102,12 +75,26 @@ public class CameraRecorder extends Activity implements SurfaceHolder.Callback {
         if (!hasPermissions(this, PERMISSIONS)) {
             ActivityCompat.requestPermissions(this, PERMISSIONS, PERMISSION_ALL);
         } else {
+
             startService(new Intent(CameraRecorder.this, LocationService.class));
             startService (new Intent(CameraRecorder.this, MqttMessageService.class));
-//            startService (new Intent(CameraRecorder.this, RecorderService.class));
             startServer();
         }
+        final Handler handler_start = new Handler();
+        handler_start.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                startCamera();
+            }
+        }, 1000);
 
+        final Handler handler_stop = new Handler();
+        handler_stop.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                stopCamera();
+            }
+        }, 50000);
         try{
             pahoMqttClient = new PahoMqttClient();
             client = pahoMqttClient.getMqttClient(getApplicationContext(), Constants.MQTT_BROKER_URL, Constants.CLIENT_ID);
@@ -118,124 +105,229 @@ public class CameraRecorder extends Activity implements SurfaceHolder.Callback {
 
 
 //MQTT Publish Code
-        if (isOnline()) {
-            final Handler handler = new Handler();
-            Timer timer = new Timer();
-            TimerTask doAsynchronousTask = new TimerTask() {
-                @Override
-                public void run() {
-                    handler.post(new Runnable() {
-                        public void run() {
-                            try {
-                                if (LocationService.infoR == null) {
-                                    Log.d("LOCATION VALUE","null");
-//                                    Toast.makeText(CameraRecorder.this, "Location value is null check code", Toast.LENGTH_LONG).show();
-                                } else {
-                                    pahoMqttClient.publishMessage(client, "" + LocationService.infoR, 1, Constants.PUBLISH_TOPIC);
-                                    Log.d("MQTT2", "" + LocationService.infoR);
-                                }
-                            } catch (Exception ignored) {
+        final Handler network = new Handler();
+        network.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if(isOnline()){
+                    realm = Realm.getDefaultInstance();
+                    if (realm.isEmpty()){
+                        try {
+                            if (LocationService.latitude == null && LocationService.longitude == null && LocationService.date_new == null) {
+                                Log.d("LOCATION VALUE","null");
+                            } else {
+                                String infoR=""+LocationService.longitude+""+LocationService.latitude+""+LocationService.date_new;
+                                pahoMqttClient.publishMessage(client,  infoR, 1, Constants.PUBLISH_TOPIC);
+                                Log.d("MQTT2", infoR);
                             }
+                        } catch (Exception ignored) {
                         }
-                    });
+                    }
+                    else{
+                        RealmResults<Model> guests = realm.where(Model.class).findAll();
+
+                        StringBuilder op= new StringBuilder();
+                        for (Model guest : guests) {
+                            op.append(guest.toString());
+                        }
+                        try {
+                            pahoMqttClient.publishMessage(client,  op.toString(), 1, Constants.PUBLISH_TOPIC);
+                        } catch (MqttException e) {
+                            e.printStackTrace();
+                        } catch (UnsupportedEncodingException e) {
+                            e.printStackTrace();
+                        }
+
+                    }
                 }
-            };
-            timer.schedule(doAsynchronousTask, 0, 1000); // 30 secs
-        } else {
-            Toast.makeText(CameraRecorder.this, "No internet available", Toast.LENGTH_LONG).show();
-        }
+                else{
 
-// Shutdown Code
-        final Button shutdown = findViewById(R.id.shutdown);
-        shutdown.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                shutDown();
+                    try{
+                        writeToDB(LocationService.latitude,LocationService.longitude,LocationService.date_new,LocationService.count);
+                    }
+                    catch(Exception e){
+                        Log.d("Realm Error",""+e);
+                    }
+                }
             }
-        });
+        },1000);
 
-//Hotspot Button
-        Button hotspot = findViewById(R.id.hotspot);
-        hotspot.setOnClickListener(new View.OnClickListener() {
-            @RequiresApi(api = Build.VERSION_CODES.O)
-            public void onClick(View v) {
-                startHotspot();
-            }
-        });
+////Realm Delete Button
+//        Button delete = findViewById(R.id.del);
+//        delete.setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                delteData();
+//            }
+//        });
+//
+//// Shutdown Code Button
+//        final Button shutdown = findViewById(R.id.shutdown);
+//        shutdown.setOnClickListener(new View.OnClickListener() {
+//            public void onClick(View v) {
+//                shutDown();
+//            }
+//        });
+//
+////Hotspot Button
+//        Button hotspot = findViewById(R.id.hotspot);
+//        hotspot.setOnClickListener(new View.OnClickListener() {
+//            @RequiresApi(api = Build.VERSION_CODES.O)
+//            public void onClick(View v) {
+//            }
+//        });
+//
+////Mount Button
+//        Button mount = findViewById(R.id.mount);
+//        mount.setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                mountStorage();
+//            }
+//        });
+//
+////Grant Button
+//        Button grant = findViewById(R.id.grant);
+//        grant.setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                grantPower();
+//            }
+//        });
+//
+////Revoke Button
+//        Button revoke = findViewById(R.id.revoke);
+//        revoke.setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                revokePower();
+//            }
+//        });
+//
+////Reboot Button
+//        Button reboot = findViewById(R.id.reboot);
+//        reboot.setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                rebootSystem();
+//            }
+//        });
+//
+//        Button lock = findViewById(R.id.lock);
+//        lock.setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                lockScreen();
+//            }
+//        });
+//
+////Realm Data
+//
+//        Button real=findViewById(R.id.realm);
+//        real.setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                showData();
+//            }
+//        });
 
-//Mount Button
-        Button mount = findViewById(R.id.mount);
-        mount.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                mountStorage();
-            }
-        });
-
-//Grant Button
-        Button grant = findViewById(R.id.grant);
-        grant.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                grantPower();
-            }
-        });
-
-//Revoke Button
-        Button revoke = findViewById(R.id.revoke);
-        revoke.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                revokePower();
-            }
-        });
-
-//Reboot Button
-        Button reboot = findViewById(R.id.reboot);
-        reboot.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                rebootSystem();
-            }
-        });
 
 
 //MQtt Subsribe Handler
 
-        subscribe_handler = new Handler();
-        subscribe_runnable = new Runnable() {
-            public void run() {
-                Subscribe();
-                subscribe_handler.postDelayed(subscribe_runnable, 10000);
+        try {
+            subscribe_handler = new Handler();
+            subscribe_runnable = new Runnable() {
+                @RequiresApi(api = Build.VERSION_CODES.O)
+                public void run() {
+                    Subscribe();
+                    subscribe_handler.postDelayed(subscribe_runnable, 10000);
+                }
+            };
+            subscribe_handler.postDelayed(subscribe_runnable, 15000);
+        }
+        catch (Exception e){
+            Toast.makeText(this,""+e,LENGTH_LONG).show();
+        }
+
+
+
+
+    }
+
+
+
+    public  void delteData(){
+        final RealmResults<Model> results = realm.where(Model.class).findAll();
+
+        realm.executeTransaction(new Realm.Transaction() {
+            @Override
+            public void execute(@NonNull Realm realm) {
+                // remove single match
+                results.deleteFirstFromRealm();
+                results.deleteLastFromRealm();
+                results.deleteAllFromRealm();
             }
-        };
-        subscribe_handler.postDelayed(subscribe_runnable, 15000);
+        });
+    }
 
+    public void showData(){
+        RealmResults<Model> guests = realm.where(Model.class).findAll();
 
-//        finish();
+        StringBuilder op= new StringBuilder();
+        for (Model guest : guests) {
+        op.append(guest.toString());
+        }
+        Log.d("Realm Data", op.toString());
+    }
+
+    public void writeToDB(final String latitude, final String longitude, final String date_new,final long count){
+        realm.executeTransactionAsync(new Realm.Transaction() {
+            @Override
+            public void execute(@NonNull Realm bgRealm) {
+                Model model = bgRealm.createObject(Model.class);
+                model.latitude=latitude;
+                model.longitude=longitude;
+                model.date=date_new;
+                model.id= count;
+            }
+        }, new Realm.Transaction.OnSuccess() {
+            @Override
+            public void onSuccess() {
+                Log.d("Realm Log","Data Entered Successfuly");
+            }
+        }, new Realm.Transaction.OnError() {
+            @Override
+            public void onError(@NonNull Throwable error) {
+                Log.d("Realm Log","Data has not been Entered");
+            }
+        });
+
     }
 
 
 
 //Shutdown
-    public void shutDown(){
+    public  void shutDown(){
         try {
             Process proc = Runtime.getRuntime()
                     .exec(new String[]{"su", "-c", "reboot -p"});
             proc.waitFor();
+            Toast.makeText(CameraRecorder.this,"Shuting Down",LENGTH_LONG).show();
         } catch (Exception ex) {
             ex.printStackTrace();
-            Toast.makeText(CameraRecorder.this, "" + ex, Toast.LENGTH_LONG).show();
         }
     }
 
 //Reboot
 
-public static void rebootSystem(){
+public  void rebootSystem(){
     try {
         Runtime rt = Runtime.getRuntime();
         String[] commands = {"su","-c","reboot"};
         Process proc = rt.exec(commands);
         proc.waitFor();
+        Toast.makeText(CameraRecorder.this,"Rebooting",LENGTH_LONG).show();
     } catch (Exception ex) {
         ex.printStackTrace();
         Log.d("Power Status:","Rebooting system");
@@ -243,12 +335,13 @@ public static void rebootSystem(){
 }
 
 //Mount
-    public static void mountStorage(){
+    public  void mountStorage(){
         try {
             Runtime rt = Runtime.getRuntime();
             String[] commands = {"su","-c","mount -o remount,rw /system"};
             Process proc = rt.exec(commands);
             proc.waitFor();
+            Toast.makeText(CameraRecorder.this,"Mounted",LENGTH_LONG).show();
 //                    BufferedReader stdInput = new BufferedReader(new
 //                            InputStreamReader(proc.getInputStream()));
 //
@@ -268,75 +361,48 @@ public static void rebootSystem(){
     }
 
 //Grant
-    public static void grantPower(){
+    public  void grantPower(){
         try {
             Runtime rt = Runtime.getRuntime();
             String[] commands = {"su","-c","sed -i  '/key 116   POWER/ s/# *//' /system/usr/keylayout/Generic.kl"};
             Process proc = rt.exec(commands);
             proc.waitFor();
+            Toast.makeText(CameraRecorder.this,"Granted",LENGTH_LONG).show();
         } catch (Exception ex) {
             ex.printStackTrace();
             Log.d("Power Status","Granted Power");
         }
     }
 
+
+//Lock
+    public  void lockScreen(){
+        try {
+            Runtime rt = Runtime.getRuntime();
+            String[] commands = {"su","-c","input keyevent 26"};
+            Process proc = rt.exec(commands);
+            proc.waitFor();
+            Toast.makeText(CameraRecorder.this,"Locked",LENGTH_LONG).show();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+
 //Revoke
-    public void revokePower(){
+    public  void revokePower(){
         try {
             Runtime rt = Runtime.getRuntime();
             String[] commands = {"su","-c","sed  -i '/key 116   POWER/s/^/#/g' /system/usr/keylayout/Generic.kl"};
             Process proc = rt.exec(commands);
             proc.waitFor();
+            Toast.makeText(CameraRecorder.this,"Revoked",LENGTH_LONG).show();
         } catch (Exception ex) {
             ex.printStackTrace();
-            Toast.makeText(CameraRecorder.this, "" + ex, Toast.LENGTH_LONG).show();
         }
     }
 
+//Check Network
 
-
-//Server Code
-    public  void startServer(){
-        new Server().start();
-        Log.d("SERVER TEST:","Turning on server now");
-    }
-
-
-//Function to start camera
-
-    public void startCamera(){
-        Intent intent = new Intent(CameraRecorder.this, RecorderService.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        startService(intent);
-        finish();
-    }
-
-//Function to stop Camera
-
-    public void stopCamera(){
-        stopService(new Intent(CameraRecorder.this, RecorderService.class));
-        Intent intent = new Intent(CameraRecorder.this, CameraRecorder.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); // You need this if starting
-        //  the activity from a service
-        intent.setAction(Intent.ACTION_MAIN);
-        intent.addCategory(Intent.CATEGORY_LAUNCHER);
-        startActivity(intent);
-    }
-
-//Hotspot
-
-    @RequiresApi(api = Build.VERSION_CODES.O)
-    public void startHotspot(){
-        if (flag) {
-            turnOnHotspot();
-            flag = false;
-        } else {
-            turnOffHotspot();
-            flag = true;
-        }
-    }
-
-//Check network
 
     public boolean isOnline() {
         Runtime runtime = Runtime.getRuntime();
@@ -352,9 +418,48 @@ public static void rebootSystem(){
         return false;
     }
 
+
+
+//Server Code
+    public  void startServer(){
+        new Server().start();
+        Toast.makeText(CameraRecorder.this,"Server Stared",LENGTH_LONG).show();
+    }
+
+
+//Function to start camera
+
+    public void startCamera(){
+        Intent intent = new Intent(CameraRecorder.this, RecorderService.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startService(intent);
+        Log.d("Camera Status","started camera");
+        finish();
+    }
+
+//Function to stop Camera
+
+    public void stopCamera(){
+
+        stopService(new Intent(CameraRecorder.this, RecorderService.class));
+        Intent intent = new Intent(CameraRecorder.this, CameraRecorder.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); // You need this if starting
+        //  the activity from a service
+        intent.setAction(Intent.ACTION_MAIN);
+        intent.addCategory(Intent.CATEGORY_LAUNCHER);
+//        Toast.makeText(CameraRecorder.this,""+batLevel,Toast.LENGTH_LONG).show();
+        Log.d("Camera Status","started camera");
+        startActivity(intent);
+    }
+
+//Hotspot
+
+    @RequiresApi(api = Build.VERSION_CODES.O)
+
+
 //Subscription
     public void Subscribe(){
-        String topic = "test/topic";
+        String topic = "trackR/"+busNumber.busId;
         try {
             pahoMqttClient.subscribe(client, topic, 1);
         } catch (MqttException e) {
@@ -392,12 +497,15 @@ public static void rebootSystem(){
     }
 
 
+
+
+
 //Hotspot code
 
     private WifiManager.LocalOnlyHotspotReservation mReservation;
 
     @RequiresApi(api = Build.VERSION_CODES.O)
-    private void turnOnHotspot() {
+    public void turnOnHotspot() {
         WifiManager manager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
 
         assert manager != null;
@@ -425,11 +533,15 @@ public static void rebootSystem(){
     }
 
     @RequiresApi(api = Build.VERSION_CODES.O)
-    private void turnOffHotspot() {
+    public  void turnOffHotspot() {
         if (mReservation != null) {
             mReservation.close();
         }
     }
+
+
+
+
 
 
     @Override
@@ -450,7 +562,7 @@ public static void rebootSystem(){
         if (grantResults.length > 0) {
             startService(new Intent(this, LocationService.class));
         } else {
-            Toast.makeText(this, "Location Service Denied", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Location Service Denied", LENGTH_LONG).show();
         }
     }
 }

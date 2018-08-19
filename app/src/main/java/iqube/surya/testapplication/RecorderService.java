@@ -88,11 +88,15 @@ public class RecorderService extends Service {
 		super.onCreate();
 
 
+
+
 		if (!mRecordingStatus) {
 			startRecording();
 		}
 		return START_STICKY;
 	}
+
+
 
 	@Override
 	public void onDestroy() {
