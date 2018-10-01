@@ -45,8 +45,10 @@ import android.content.Intent;
 import android.hardware.Camera;
 import android.hardware.Camera.Size;
 import android.media.MediaRecorder;
+import android.os.Build;
 import android.os.Environment;
 import android.os.IBinder;
+import android.support.annotation.RequiresApi;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -55,6 +57,7 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
 public class RecorderService extends Service {
@@ -65,6 +68,7 @@ public class RecorderService extends Service {
 	private MediaRecorder mMediaRecorder;
 //	CamcorderProfile cpHigh = CamcorderProfile.get(CamcorderProfile.QUALITY_HIGH);
 	
+	@RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
 	@Override
 	public void onCreate() {
 		mRecordingStatus = false;
@@ -155,12 +159,12 @@ public class RecorderService extends Service {
 
 			mMediaRecorder.prepare();
 			mMediaRecorder.start();
-
 			mRecordingStatus = true;
 
-			return true;
 
-		} catch (IllegalStateException e) {
+			return true;
+		}
+		catch (IllegalStateException e) {
 			Log.d(TAG, e.getMessage());
 			e.printStackTrace();
 			return false;

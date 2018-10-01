@@ -15,6 +15,7 @@ import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.support.annotation.RequiresApi;
 import android.support.v4.app.ActivityCompat;
+import android.text.format.Formatter;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.SurfaceHolder;
@@ -27,8 +28,12 @@ import android.widget.EditText;
 import android.widget.Toast;
 import org.eclipse.paho.android.service.MqttAndroidClient;
 import org.eclipse.paho.client.mqttv3.MqttException;
+
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
 import io.realm.Realm;
@@ -47,14 +52,18 @@ public class CameraRecorder extends Activity implements SurfaceHolder.Callback {
     public static Camera mCamera;
     private MqttAndroidClient client;
     private PahoMqttClient pahoMqttClient;
-    public Handler subscribe_handler = null;
-    public static Runnable subscribe_runnable = null;
+//    public Handler subscribe_handler = null;
+//    public static Runnable subscribe_runnable = null;
+    public Handler publish_handler = null;
+    public static Runnable publish_runnable = null;
+    public static String ip;
     Realm realm;
 
 
 
 
 
+    @RequiresApi(api = Build.VERSION_CODES.O)
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -75,18 +84,39 @@ public class CameraRecorder extends Activity implements SurfaceHolder.Callback {
         if (!hasPermissions(this, PERMISSIONS)) {
             ActivityCompat.requestPermissions(this, PERMISSIONS, PERMISSION_ALL);
         } else {
-
+            turnOnHotspot();
             startService(new Intent(CameraRecorder.this, LocationService.class));
             startService (new Intent(CameraRecorder.this, MqttMessageService.class));
-            startServer();
+            ip=IP();
+
+            if(isOnline()){
+                try{
+                    pahoMqttClient = new PahoMqttClient();
+                    client = pahoMqttClient.getMqttClient(getApplicationContext(), Constants.MQTT_BROKER_URL, Constants.CLIENT_ID);
+                }
+                catch (Exception e){
+                    Log.d("CameraActivity:",""+e);
+                }
+            }
+            else
+                System.out.println("no mqtt connection");
+
+            try {
+               MyServer server = new MyServer();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+//            startServer();
         }
         final Handler handler_start = new Handler();
         handler_start.postDelayed(new Runnable() {
             @Override
             public void run() {
                 startCamera();
-            }
-        }, 1000);
+                }
+
+        }, 10900);
 
         final Handler handler_stop = new Handler();
         handler_stop.postDelayed(new Runnable() {
@@ -95,62 +125,75 @@ public class CameraRecorder extends Activity implements SurfaceHolder.Callback {
                 stopCamera();
             }
         }, 50000);
-        try{
-            pahoMqttClient = new PahoMqttClient();
-            client = pahoMqttClient.getMqttClient(getApplicationContext(), Constants.MQTT_BROKER_URL, Constants.CLIENT_ID);
-        }
-        catch (Exception e){
-            Log.d("CameraActivity:",""+e);
-        }
 
 
-//MQTT Publish Code
-        final Handler network = new Handler();
-        network.postDelayed(new Runnable() {
+//MQTT Publish and Subscribe Handler Code
+
+        Thread thread = new Thread(new Runnable() {
+
             @Override
             public void run() {
-                if(isOnline()){
-                    realm = Realm.getDefaultInstance();
-                    if (realm.isEmpty()){
+                try  {
+                    UDPClient udpClient =new UDPClient();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    System.out.println(e);
+                }
+            }
+        });
+
+        thread.start();
+
+
+
+        try {
+            publish_handler = new Handler();
+            publish_runnable = new Runnable() {
+                @RequiresApi(api = Build.VERSION_CODES.O)
+                public void run() {
+                    if(isOnline()) {
+                        if(client.isConnected())
                         try {
                             if (LocationService.latitude == null && LocationService.longitude == null && LocationService.date_new == null) {
-                                Log.d("LOCATION VALUE","null");
+                                Log.d("LOCATION VALUE", "null");
                             } else {
-                                String infoR=""+LocationService.longitude+""+LocationService.latitude+""+LocationService.date_new;
-                                pahoMqttClient.publishMessage(client,  infoR, 1, Constants.PUBLISH_TOPIC);
+                                String infoR = "" + LocationService.longitude + "" + LocationService.latitude + "" + LocationService.date_new;
+                                pahoMqttClient.publishMessage(client, infoR, 1, Constants.PUBLISH_TOPIC);
                                 Log.d("MQTT2", infoR);
                             }
                         } catch (Exception ignored) {
                         }
-                    }
-                    else{
-                        RealmResults<Model> guests = realm.where(Model.class).findAll();
+                        else
+                            Log.d("Connection MQTT","mqtt connection not made");
 
-                        StringBuilder op= new StringBuilder();
-                        for (Model guest : guests) {
-                            op.append(guest.toString());
+                        if(client.isConnected())
+                            Subscribe();
+                        else
+                            Log.d("Connection MQTT","mqtt connection not made");
+                    }
+                    else {
+                        Log.d("Network Error", "No internet , adding to realmdb");
+                        Realm.init(getApplicationContext());
+                        realm = Realm.getDefaultInstance();
+                        try{
+                            if (LocationService.latitude != null && LocationService.longitude != null && LocationService.date_new != null) {
+                                writeToDB(LocationService.latitude, LocationService.longitude, LocationService.date_new, LocationService.count);
+                                Log.d("Realm Status", "addedto realm");
+                            }
                         }
-                        try {
-                            pahoMqttClient.publishMessage(client,  op.toString(), 1, Constants.PUBLISH_TOPIC);
-                        } catch (MqttException e) {
-                            e.printStackTrace();
-                        } catch (UnsupportedEncodingException e) {
-                            e.printStackTrace();
+                        catch(Exception e){
+                            Log.d("Realm Error",""+e);
                         }
 
                     }
+                    publish_handler.postDelayed(publish_runnable, 1000);
                 }
-                else{
-
-                    try{
-                        writeToDB(LocationService.latitude,LocationService.longitude,LocationService.date_new,LocationService.count);
-                    }
-                    catch(Exception e){
-                        Log.d("Realm Error",""+e);
-                    }
-                }
-            }
-        },1000);
+            };
+            publish_handler.postDelayed(publish_runnable, 1000);
+        }
+        catch (Exception e){
+            Toast.makeText(this,""+e,LENGTH_LONG).show();
+        }
 
 ////Realm Delete Button
 //        Button delete = findViewById(R.id.del);
@@ -174,6 +217,8 @@ public class CameraRecorder extends Activity implements SurfaceHolder.Callback {
 //        hotspot.setOnClickListener(new View.OnClickListener() {
 //            @RequiresApi(api = Build.VERSION_CODES.O)
 //            public void onClick(View v) {
+//                turnOnHotspot();
+//
 //            }
 //        });
 //
@@ -234,24 +279,21 @@ public class CameraRecorder extends Activity implements SurfaceHolder.Callback {
 
 
 //MQtt Subsribe Handler
-
-        try {
-            subscribe_handler = new Handler();
-            subscribe_runnable = new Runnable() {
-                @RequiresApi(api = Build.VERSION_CODES.O)
-                public void run() {
-                    Subscribe();
-                    subscribe_handler.postDelayed(subscribe_runnable, 10000);
-                }
-            };
-            subscribe_handler.postDelayed(subscribe_runnable, 15000);
-        }
-        catch (Exception e){
-            Toast.makeText(this,""+e,LENGTH_LONG).show();
-        }
-
-
-
+//
+//        try {
+//            subscribe_handler = new Handler();
+//            subscribe_runnable = new Runnable() {
+//                @RequiresApi(api = Build.VERSION_CODES.O)
+//                public void run() {
+//                    Subscribe();
+//                    subscribe_handler.postDelayed(subscribe_runnable, 10000);
+//                }
+//            };
+//            subscribe_handler.postDelayed(subscribe_runnable, 15000);
+//        }
+//        catch (Exception e){
+//            Toast.makeText(this,""+e,LENGTH_LONG).show();
+//        }
 
     }
 
@@ -341,7 +383,7 @@ public  void rebootSystem(){
             String[] commands = {"su","-c","mount -o remount,rw /system"};
             Process proc = rt.exec(commands);
             proc.waitFor();
-            Toast.makeText(CameraRecorder.this,"Mounted",LENGTH_LONG).show();
+            Log.d("Mounting","Mounted");
 //                    BufferedReader stdInput = new BufferedReader(new
 //                            InputStreamReader(proc.getInputStream()));
 //
@@ -400,6 +442,36 @@ public  void rebootSystem(){
             ex.printStackTrace();
         }
     }
+    //Find ip
+    public static String IP(){
+        String retval = null;
+        try {
+            Runtime rt = Runtime.getRuntime();
+            String[] commands = {"su","-c","ifconfig | awk '\n" +
+                    "    /^[^ ]/ {interface = $1}\n" +
+                    "    $1==\"inet\" && interface ~ /^(wlan0)$/ {sub(/^addr:/, \"\", $2); print $2}\n" +
+                    "'"};
+            Process proc = rt.exec(commands);
+            BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(proc.getInputStream()));
+
+            int read;
+            char[] buffer = new char[4096];
+            StringBuffer output = new StringBuffer();
+            while ((read = reader.read(buffer)) > 0) {
+                output.append(buffer, 0, read);
+            }
+            retval= String.valueOf(output);
+            Log.d("IP Valuesss",retval);
+            reader.close();
+            proc.waitFor();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+
+        return  retval;
+
+    }
 
 //Check Network
 
@@ -439,6 +511,7 @@ public  void rebootSystem(){
 
 //Function to stop Camera
 
+    @RequiresApi(api = Build.VERSION_CODES.O)
     public void stopCamera(){
 
         stopService(new Intent(CameraRecorder.this, RecorderService.class));
@@ -447,6 +520,7 @@ public  void rebootSystem(){
         //  the activity from a service
         intent.setAction(Intent.ACTION_MAIN);
         intent.addCategory(Intent.CATEGORY_LAUNCHER);
+        turnOffHotspot();
 //        Toast.makeText(CameraRecorder.this,""+batLevel,Toast.LENGTH_LONG).show();
         Log.d("Camera Status","started camera");
         startActivity(intent);
@@ -507,6 +581,7 @@ public  void rebootSystem(){
     @RequiresApi(api = Build.VERSION_CODES.O)
     public void turnOnHotspot() {
         WifiManager manager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+
 
         assert manager != null;
         manager.startLocalOnlyHotspot(new WifiManager.LocalOnlyHotspotCallback() {

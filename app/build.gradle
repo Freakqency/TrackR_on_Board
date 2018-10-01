@@ -34,7 +34,10 @@ dependencies {
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
     implementation 'org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.0.3-SNAPSHOT'
     implementation 'org.eclipse.paho:org.eclipse.paho.android.service:1.0.3-SNAPSHOT'
+    implementation 'com.nanohttpd:nanohttpd-webserver:2.2.0'
 }
+
+
 
 realm {
     syncEnabled = true;

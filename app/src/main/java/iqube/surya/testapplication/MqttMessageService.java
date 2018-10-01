@@ -7,7 +7,6 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
 import android.util.Log;
-import android.widget.Toast;
 
 import org.eclipse.paho.android.service.MqttAndroidClient;
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
@@ -47,39 +46,42 @@ public class MqttMessageService extends Service {
                 CameraRecorder cameraRecorder = new CameraRecorder();
                 switch (message.toString()) {
                     case "Shutdown":
+                        Log.d("MQTT Subscription","Shutdown");
                         cameraRecorder.shutDown();
                         break;
-                    case "Start Hotspot":
-                        cameraRecorder.turnOnHotspot();
-                        break;
                     case "Mount":
+                        Log.d("MQTT Subscription","Mount");
                         cameraRecorder.mountStorage();
                         break;
                     case "Grant":
+                        Log.d("MQTT Subscription","Grant");
                         cameraRecorder.grantPower();
                         break;
                     case "Revoke":
+                        Log.d("MQTT Subscription","Revoke");
                         cameraRecorder.revokePower();
                         break;
                     case "Reboot":
-                        cameraRecorder.rebootSystem();
+                        Log.d("MQTT Subscription","Reboot");
+//                        cameraRecorder.rebootSystem();
                         break;
                     case "Lock":
+                        Log.d("MQTT Subscription","Lock");
                         cameraRecorder.lockScreen();
                         break;
-                    case "Stop Hotspot":
+
+                    case "onServer":
+                        Log.d("MQTT Subscription","onServer");
                         cameraRecorder.turnOffHotspot();
                         break;
 
-                    case "Stop Server":
-                        cameraRecorder.turnOffHotspot();
-                        break;
-
-                    case "Start Camera":
+                    case "onCamera":
+                        Log.d("MQTT Subscription","onCamera");
                         cameraRecorder.startCamera();
                         break;
 
-                    case "Stop Camera":
+                    case "offCamera":
+                        Log.d("MQTT Subscription","offCamera");
                         cameraRecorder.stopCamera();
                         break;
 
