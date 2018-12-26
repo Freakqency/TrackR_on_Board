@@ -84,7 +84,7 @@ public class CameraRecorder extends Activity implements SurfaceHolder.Callback {
         if (!hasPermissions(this, PERMISSIONS)) {
             ActivityCompat.requestPermissions(this, PERMISSIONS, PERMISSION_ALL);
         } else {
-            turnOnHotspot();
+//            turnOnHotspot();
             startService(new Intent(CameraRecorder.this, LocationService.class));
             startService (new Intent(CameraRecorder.this, MqttMessageService.class));
             ip=IP();
@@ -109,22 +109,22 @@ public class CameraRecorder extends Activity implements SurfaceHolder.Callback {
 
 //            startServer();
         }
-        final Handler handler_start = new Handler();
-        handler_start.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                startCamera();
-                }
+//        final Handler handler_start = new Handler();
+//        handler_start.postDelayed(new Runnable() {
+//            @Override
+//            public void run() {
+//                startCamera();
+//                }
+//
+//        }, 10900);
 
-        }, 10900);
-
-        final Handler handler_stop = new Handler();
-        handler_stop.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                stopCamera();
-            }
-        }, 50000);
+//        final Handler handler_stop = new Handler();
+//        handler_stop.postDelayed(new Runnable() {
+//            @Override
+//            public void run() {
+//                stopCamera();
+//            }
+//        }, 50000);
 
 
 //MQTT Publish and Subscribe Handler Code
@@ -155,10 +155,12 @@ public class CameraRecorder extends Activity implements SurfaceHolder.Callback {
                         if(client.isConnected())
                         try {
                             if (LocationService.latitude == null && LocationService.longitude == null && LocationService.date_new == null) {
+                                Toast.makeText(CameraRecorder.this,"not sent NUll!!",LENGTH_LONG).show();
                                 Log.d("LOCATION VALUE", "null");
                             } else {
                                 String infoR = "" + LocationService.longitude + "" + LocationService.latitude + "" + LocationService.date_new;
                                 pahoMqttClient.publishMessage(client, infoR, 1, Constants.PUBLISH_TOPIC);
+                                Toast.makeText(CameraRecorder.this,"SENT:"+infoR,LENGTH_LONG).show();
                                 Log.d("MQTT2", infoR);
                             }
                         } catch (Exception ignored) {

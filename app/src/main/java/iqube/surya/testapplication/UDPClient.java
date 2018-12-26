@@ -20,7 +20,7 @@ class UDPClient
         }
         InetAddress IPAddress = null;
         try {
-            IPAddress = InetAddress.getByName("192.168.43.57");
+            IPAddress = InetAddress.getByName("192.168.43.64");
         } catch (UnknownHostException e) {
             e.printStackTrace();
         }

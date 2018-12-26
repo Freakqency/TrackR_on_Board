@@ -11,7 +11,7 @@ public class MyServer extends NanoHTTPD {
     public MyServer() throws IOException {
         super(PORT);
         start();
-        System.out.println( "\nRunning! Point your browers to http://localhost:8080/ \n" );
+        System.out.println( "\nRunning! Point your browers to http://localhost:1337/ \n" );
     }
 
     @Override
@@ -23,7 +23,7 @@ public class MyServer extends NanoHTTPD {
         if(rfid.length() == 10)
         return newFixedLengthResponse( msg + "</body></html>\n" );
         else
-            return newFixedLengthResponse( msg + "</body></html>\n" );
+            return newFixedLengthResponse( errmsg + "</body></html>\n" );
 
     }
 }

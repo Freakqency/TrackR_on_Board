@@ -147,14 +147,15 @@ public class RecorderService extends Service {
 			mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
 			mMediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
 			mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
-//			mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
-//            mMediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
-			mMediaRecorder.setVideoSize(640, 480);
-			mMediaRecorder.setVideoFrameRate(16); //might be auto-determined due to lighting
-			mMediaRecorder.setVideoEncodingBitRate(3000000);
-			mMediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);// MPEG_4_SP
+			mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
+            mMediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
+			mMediaRecorder.setVideoSize(320, 240);
+//			mMediaRecorder.setVideoFrameRate(16); //might be auto-determined due to lighting
+//			mMediaRecorder.setVideoEncodingBitRate(3000000);
+			mMediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);		// MPEG_4_SP
 			mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
 			mMediaRecorder.setOutputFile(Environment.getExternalStorageDirectory().getPath() + dtout);
+			mMediaRecorder.setMaxDuration(500000);
 			mMediaRecorder.setPreviewDisplay(mSurfaceHolder.getSurface());
 
 			mMediaRecorder.prepare();
