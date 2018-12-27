@@ -54,6 +54,7 @@ public class CameraRecorder extends Activity implements SurfaceHolder.Callback {
     private PahoMqttClient pahoMqttClient;
 //    public Handler subscribe_handler = null;
 //    public static Runnable subscribe_runnable = null;
+    public static Boolean flag=Boolean.FALSE;
     public Handler publish_handler = null;
     public static Runnable publish_runnable = null;
     public static String ip;
@@ -145,23 +146,31 @@ public class CameraRecorder extends Activity implements SurfaceHolder.Callback {
         thread.start();
 
 
-
         try {
             publish_handler = new Handler();
             publish_runnable = new Runnable() {
                 @RequiresApi(api = Build.VERSION_CODES.O)
                 public void run() {
                     if(isOnline()) {
+
                         if(client.isConnected())
                         try {
+
                             if (LocationService.latitude == null && LocationService.longitude == null && LocationService.date_new == null) {
-                                Toast.makeText(CameraRecorder.this,"not sent NUll!!",LENGTH_LONG).show();
+//                                Toast.makeText(CameraRecorder.this,"not sent NUll!!",LENGTH_LONG).show();
+                                String loc_rfid="N/A,RFID:"+MyServer.rf_val;
+                                pahoMqttClient.publishMessage(client, loc_rfid, 1, Constants.PUBLISH_TOPIC);
                                 Log.d("LOCATION VALUE", "null");
                             } else {
-                                String infoR = "" + LocationService.longitude + "" + LocationService.latitude + "" + LocationService.date_new;
+                                String infoR="";
+                                if (MyServer.card_flag == "True")
+                                 infoR = "{'Date&Time':'"+LocationService.date_new+"','Longitude':" + LocationService.longitude + ",'Latitude':" + LocationService.latitude +",'posfix':'1','Busno':"+busNumber.busId+",'speed':"+LocationService.speed+",'card':True,'UID':'"+MyServer.rf_val+"'}";
+                                else
+                                    infoR = "{'Date&Time':'"+LocationService.date_new+"','Longitude':" + LocationService.longitude + ",'Latitude':" + LocationService.latitude +",'posfix':'1','Busno':"+busNumber.busId+",'speed':"+LocationService.speed+",'card':False}";
                                 pahoMqttClient.publishMessage(client, infoR, 1, Constants.PUBLISH_TOPIC);
-                                Toast.makeText(CameraRecorder.this,"SENT:"+infoR,LENGTH_LONG).show();
+//                                Toast.makeText(CameraRecorder.this,"SENT:"+infoR,LENGTH_LONG).show();
                                 Log.d("MQTT2", infoR);
+
                             }
                         } catch (Exception ignored) {
                         }

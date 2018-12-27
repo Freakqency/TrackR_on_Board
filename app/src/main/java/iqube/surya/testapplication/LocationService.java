@@ -27,6 +27,7 @@ public class LocationService extends Service {
     private Handler mHandler;
     public static long count=0;
     public static String longitude;
+    public static String speed;
     public static String latitude;
     public static String date_new;
 
@@ -73,15 +74,17 @@ public class LocationService extends Service {
                 }
             }finally {
                 if(location!=null) {
+
                     double lat = location.getLatitude() % 0.00001;
                     lat = location.getLatitude() - lat;
                     double longt = location.getLongitude() % 0.00001;
                     longt = location.getLongitude() - longt;
                     Date date = new Date();
-                    SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US);//2016-08-09%2010:45:01.253
+                    SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);//2016-08-09%2010:45:01.253
                     latitude=""+lat;
                     longitude=""+longt;
-                    date_new=" "+simpleDateFormat.format(date);
+                    speed=""+location.getSpeed();
+                    date_new=""+simpleDateFormat.format(date);
                     count=count+1;
 //                    Log.d("Crazy Test",infoR);
 

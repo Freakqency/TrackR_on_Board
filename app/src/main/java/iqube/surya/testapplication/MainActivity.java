@@ -8,6 +8,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
+import com.bugfender.sdk.Bugfender;
 
 import static android.widget.Toast.LENGTH_LONG;
 
@@ -39,3 +40,7 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 }
+
+
+
+
